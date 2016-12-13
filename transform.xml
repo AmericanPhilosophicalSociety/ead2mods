@@ -1,0 +1,577 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<xsl:stylesheet version="2.0"
+   xmlns:ead="urn:isbn:1-931666-22-9"
+   xmlns:xsl="http://www.w3.org/1999/XSL/Transform" 
+   exclude-result-prefixes="#all">
+  <xsl:output method="xml" indent="yes" 
+      encoding="UTF-8" media-type="text/xml; charset=UTF-8" 
+      omit-xml-declaration="no"/>
+  <xsl:strip-space elements="*"/>
+
+  <!-- 
+  *******************************************************************
+  This stylesheet transforms EAD contents to individual MODS records for ingest into the APS digital repository.
+  It provides conversion for c02, c03, and c04 level contents. To go deeper, simply adopt the choose logic and copy the lines within the xsl:result-document tags. Be sure to reflect the new depth in result-document and the mods tags within mods:relatedItem, which use top-level description for information
+  This sheet creates a new directory for every series and a new subdirectory for every component level.
+  Due to the reality that not every EAD finding aid conforms to the same standard, it is nearly impossible to make a one size fits all solution. This stylesheet is designed as a beginning step. You may need to add or adjust to accomodate the realities of the finding aid you're working with. It's a good idea to scan the ead for oddities and review some test records before ingesting the newly created MODS.
+  
+  *******************************************************************
+  -->
+
+  <xsl:template match="/">
+    <xsl:for-each select="ead:ead/ead:archdesc/ead:dsc/ead:c01">
+      <xsl:choose>
+        <xsl:when test="ead:c02">
+          <xsl:for-each select="ead:c02">
+            <xsl:choose>
+              <xsl:when test="ead:c03">
+                <xsl:for-each select="ead:c03">
+                  <xsl:choose>
+                    <xsl:when test="ead:c04">                    
+                      <xsl:for-each select="ead:c04">
+
+                        <!-- c04 level items -->
+                        <xsl:result-document href="{../../../../../ead:did/ead:unitid}_{../../../ead:did/ead:unittitle}/c04/c04_{position()}.xml">
+                          <!-- top level mods declaration -->
+                          <mods:mods xmlns="http://www.loc.gov/mods/v3" xmlns:mods="http://www.loc.gov/mods/v3" xmlns:xlink="http://www.w3.org/1999/xlink" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+
+                            <!-- mods:relatedItem - including the collection from which the item is drawn -->  
+                            <mods:relatedItem displayLabel="Parent Collection" type="host">
+                              <mods:titleInfo>
+                                <mods:title>
+                                  <xsl:value-of select="../../../../../ead:did/ead:unittitle"/>
+                                </mods:title>
+                              </mods:titleInfo>
+                              <mods:identifier>
+                                <xsl:value-of select="../../../../../ead:did/ead:unitid"/>
+                              </mods:identifier>
+                              <mods:location>
+                                <mods:url>
+                                  <xsl:value-of select="../../../../../../ead:eadheader/ead:eadid/@url"/>
+                                </mods:url>
+                              </mods:location>
+                            </mods:relatedItem>
+
+                            <!-- mods:titleInfo - title of item -->
+                            <mods:titleInfo><mods:title>
+                              <!-- adding a conditional here to handle unittitles that end in ; - can remove if desired-->
+                              <xsl:choose>
+                                <xsl:when test="ends-with(ead:did/ead:unittitle, ';')">
+                                  <xsl:value-of select="substring-before(ead:did/ead:unittitle, ';')"/>
+                                </xsl:when>
+                                <xsl:otherwise>
+                                  <xsl:value-of select="ead:did/ead:unittitle"/>
+                                </xsl:otherwise>
+                              </xsl:choose>                  
+                            </mods:title></mods:titleInfo>
+
+                            <!-- mods:originInfo -->
+                            <xsl:if test="ead:did/ead:unitdate">
+                              <mods:originInfo>
+                                <mods:dateIssued>
+                                  <xsl:value-of select="ead:did/ead:unitdate"/>
+                                </mods:dateIssued>
+                              </mods:originInfo>
+                            </xsl:if>
+
+                            <!-- mods:typeOfResource - based on controlled values - http://www.loc.gov/standards/mods/userguide/typeofresource.html - assuming it's text here - adjust if necessary -->
+                            <mods:typeOfResource>text</mods:typeOfResource>
+
+                            <!-- mods:physicalDescription - combination of data from EAD and controlled values -->
+                            <mods:physicalDescription>
+                              <xsl:if test="ead:did/ead:physdesc">
+                                <mods:extent>
+                                  <xsl:value-of select="ead:did/ead:physdesc"/>
+                                </mods:extent>
+                              </xsl:if>
+                              <!-- mods:digitalOrigin - controlled vocabulary - assume this is a scanning job -->
+                              <mods:digitalOrigin>reformatted digital</mods:digitalOrigin>
+                              <!-- mods:reformattingQuality - controlled vocabulary - must be one of: access, preservation, or replacement - adjust as necessary -->
+                              <mods:reformattingQuality>access</mods:reformattingQuality>
+                              <!-- mods:form - this will vary - it may be best to hand edit these after ingest -->
+                              <mods:form>text</mods:form>
+                            </mods:physicalDescription>
+                            <!-- mods:accessCondition - inserting copyright -->
+                            <mods:accessCondition type="use and reproduction">Copyright American Philosophical Society. For reproduction and permission information, see http://www.amphilsoc.org/library/rights.htm</mods:accessCondition>
+
+                            <!-- mods:genre -->
+                            <xsl:if test="ead:did/ead:physdesc/ead:genreform">
+                              <mods:genre>
+                                <xsl:value-of select="ead:did/ead:physdesc/ead:genreform"/>
+                              </mods:genre>
+                            </xsl:if>                           
+
+                            <!-- mods:name  -->
+                            <xsl:if test="ead:did/ead:origination">
+                              <xsl:for-each select="ead:did/ead:origination">
+                                <xsl:choose>
+                                  <xsl:when test="./ead:persname">
+                                    <mods:name type="personal">
+                                      <mods:namePart>
+                                        <xsl:value-of select="."/>
+                                      </mods:namePart>
+                                    </mods:name>
+                                  </xsl:when>
+                                  <xsl:when test="./ead:corpname">
+                                    <mods:name type="corporate">
+                                      <mods:namePart>
+                                        <xsl:value-of select="."/>
+                                      </mods:namePart>
+                                    </mods:name>
+                                  </xsl:when>
+                                  <xsl:when test="./ead:famname">
+                                    <mods:name type="family">
+                                      <mods:namePart>
+                                        <xsl:value-of select="."/>
+                                      </mods:namePart>
+                                    </mods:name>
+                                  </xsl:when>
+                                  <xsl:when test="./ead:confname">
+                                    <mods:name type="conference">
+                                      <mods:namePart>
+                                        <xsl:value-of select="."/>
+                                      </mods:namePart>
+                                    </mods:name>
+                                  </xsl:when>
+                                  <xsl:otherwise>
+                                    <mods:name>
+                                      <mods:namePart>
+                                        <xsl:value-of select="."/>
+                                      </mods:namePart>
+                                    </mods:name>
+                                  </xsl:otherwise>
+                                </xsl:choose>
+                                <xsl:if test="./@label">
+                                  <mods:role>
+                                    <mods:roleTerm type="text">
+                                      <xsl:value-of select="./@label"/>
+                                    </mods:roleTerm>
+                                  </mods:role>
+                                </xsl:if>
+                              </xsl:for-each>
+                            </xsl:if>
+
+                            <!-- mods:abstract - it's unlikely that there will be an ead:abstract at the component level, but we accommodate it here -->
+                            <xsl:if test="ead:did/ead:abstract">
+                              <mods:abstract>
+                                <xsl:value-of select="ead:did/ead:abstract"/>
+                              </mods:abstract>
+                            </xsl:if>
+                            <xsl:if test="ead:scopecontent">
+                              <mods:abstract>
+                                <xsl:for-each select="ead:scopecontent/ead:p">
+                                  <xsl:value-of select="."/>
+                                  <xsl:text> </xsl:text>
+                                </xsl:for-each>
+                              </mods:abstract>
+                            </xsl:if>
+
+                            <!-- mods:language - usually at the collection level, but we should accommodate it here -->
+                            <xsl:if test="ead:did/ead:langmaterial/ead:language">
+                              <mods:language>
+                                <xsl:for-each select="ead:did/ead:langmaterial/ead:language">
+                                  <xsl:if test=". != ''">
+                                    <mods:languageTerm type='text'>
+                                      <xsl:value-of select="."/>
+                                    </mods:languageTerm>  
+                                  </xsl:if>
+                                  <xsl:if test="./@langcode">
+                                    <mods:languageTerm type='code'>
+                                      <xsl:value-of select="./@langcode"/>
+                                    </mods:languageTerm>
+                                  </xsl:if>
+                                </xsl:for-each>
+                              </mods:language>  
+                            </xsl:if>
+
+                            <!-- mods:note - best guess here, notes can be dropped a lot of places - separated a few into easy to read categories for easier modification -->
+                            <xsl:if test="ead:note">
+                              <mods:note>
+                                <xsl:value-of select="ead:note/ead:p"/>
+                              </mods:note>
+                            </xsl:if>
+
+                            <xsl:if test="ead:did/ead:note">
+                              <mods:note>
+                                <xsl:value-of select="ead:did/ead:note/ead:p"/>
+                              </mods:note>
+                            </xsl:if>
+
+                            <xsl:if test="ead:odd">
+                              <mods:note>
+                                <xsl:value-of select="ead:odd"/>
+                              </mods:note>
+                            </xsl:if>
+
+                          </mods:mods>
+                        </xsl:result-document>
+                      </xsl:for-each>
+                    </xsl:when>
+                    <xsl:otherwise>
+
+                      <!-- c03 level items -->
+                      <xsl:result-document href="{../../../../ead:did/ead:unitid}_{../../ead:did/ead:unittitle}/c03/c03_{position()}.xml">
+                        <!-- top level mods declaration -->
+                        <mods:mods xmlns="http://www.loc.gov/mods/v3" xmlns:mods="http://www.loc.gov/mods/v3" xmlns:xlink="http://www.w3.org/1999/xlink" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+
+                          <!-- mods:relatedItem - including the collection from which the item is drawn -->  
+                          <mods:relatedItem displayLabel="Parent Collection" type="host">
+                            <mods:titleInfo>
+                              <mods:title>
+                                <xsl:value-of select="../../../../ead:did/ead:unittitle"/>
+                              </mods:title>
+                            </mods:titleInfo>
+                            <mods:identifier>
+                              <xsl:value-of select="../../../../ead:did/ead:unitid"/>
+                            </mods:identifier>
+                            <mods:location>
+                              <mods:url>
+                                <xsl:value-of select="../../../../../ead:eadheader/ead:eadid/@url"/>
+                              </mods:url>
+                            </mods:location>
+                          </mods:relatedItem>
+
+                            <!-- mods:titleInfo - title of item -->
+                            <mods:titleInfo><mods:title>
+                              <!-- adding a conditional here to handle unittitles that end in ; - can remove if desired-->
+                              <xsl:choose>
+                                <xsl:when test="ends-with(ead:did/ead:unittitle, ';')">
+                                  <xsl:value-of select="substring-before(ead:did/ead:unittitle, ';')"/>
+                                </xsl:when>
+                                <xsl:otherwise>
+                                  <xsl:value-of select="ead:did/ead:unittitle"/>
+                                </xsl:otherwise>
+                              </xsl:choose>                  
+                            </mods:title></mods:titleInfo>
+
+                          <!-- mods:originInfo -->
+                          <xsl:if test="ead:did/ead:unitdate">
+                            <mods:originInfo>
+                              <mods:dateIssued>
+                                <xsl:value-of select="ead:did/ead:unitdate"/>
+                              </mods:dateIssued>
+                            </mods:originInfo>
+                          </xsl:if>
+
+                          <!-- mods:typeOfResource - based on controlled values - http://www.loc.gov/standards/mods/userguide/typeofresource.html - assuming it's text here - adjust if necessary -->
+                          <mods:typeOfResource>text</mods:typeOfResource>
+
+                          <!-- mods:physicalDescription - combination of data from EAD and controlled values -->
+                          <mods:physicalDescription>
+                            <xsl:if test="ead:did/ead:physdesc">
+                              <mods:extent>
+                                <xsl:value-of select="ead:did/ead:physdesc"/>
+                              </mods:extent>
+                            </xsl:if>
+                            <!-- mods:digitalOrigin - controlled vocabulary - assume this is a scanning job -->
+                            <mods:digitalOrigin>reformatted digital</mods:digitalOrigin>
+                            <!-- mods:reformattingQuality - controlled vocabulary - must be one of: access, preservation, or replacement - adjust as necessary -->
+                            <mods:reformattingQuality>access</mods:reformattingQuality>
+                            <!-- mods:form - this will vary - it may be best to hand edit these after ingest -->
+                            <mods:form>text</mods:form>
+                          </mods:physicalDescription>
+                          <!-- mods:accessCondition - inserting copyright -->
+                          <mods:accessCondition type="use and reproduction">Copyright American Philosophical Society. For reproduction and permission information, see http://www.amphilsoc.org/library/rights.htm</mods:accessCondition>
+
+                          <!-- mods:genre -->
+                          <xsl:if test="ead:did/ead:physdesc/ead:genreform">
+                            <mods:genre>
+                              <xsl:value-of select="ead:did/ead:physdesc/ead:genreform"/>
+                            </mods:genre>
+                          </xsl:if>  
+
+                          <!-- mods:name  -->
+                          <xsl:if test="ead:did/ead:origination">
+                            <xsl:for-each select="ead:did/ead:origination">
+                              <xsl:choose>
+                                <xsl:when test="./ead:persname">
+                                  <mods:name type="personal">
+                                    <mods:namePart>
+                                      <xsl:value-of select="."/>
+                                    </mods:namePart>
+                                  </mods:name>
+                                </xsl:when>
+                                <xsl:when test="./ead:corpname">
+                                  <mods:name type="corporate">
+                                    <mods:namePart>
+                                      <xsl:value-of select="."/>
+                                    </mods:namePart>
+                                  </mods:name>
+                                </xsl:when>
+                                <xsl:when test="./ead:famname">
+                                  <mods:name type="family">
+                                    <mods:namePart>
+                                      <xsl:value-of select="."/>
+                                    </mods:namePart>
+                                  </mods:name>
+                                </xsl:when>
+                                <xsl:when test="./ead:confname">
+                                  <mods:name type="conference">
+                                    <mods:namePart>
+                                      <xsl:value-of select="."/>
+                                    </mods:namePart>
+                                  </mods:name>
+                                </xsl:when>
+                                <xsl:otherwise>
+                                  <mods:name>
+                                    <mods:namePart>
+                                      <xsl:value-of select="."/>
+                                    </mods:namePart>
+                                  </mods:name>
+                                </xsl:otherwise>
+                              </xsl:choose>
+                              <xsl:if test="./@label">
+                                <mods:role>
+                                  <mods:roleTerm type="text">
+                                    <xsl:value-of select="./@label"/>
+                                  </mods:roleTerm>
+                                </mods:role>
+                              </xsl:if>
+                            </xsl:for-each>
+                          </xsl:if>
+
+                          <!-- mods:abstract - it's unlikely that there will be an ead:abstract at the component level, but we accommodate it here -->
+                          <xsl:if test="ead:did/ead:abstract">
+                            <mods:abstract>
+                              <xsl:value-of select="ead:did/ead:abstract"/>
+                            </mods:abstract>
+                          </xsl:if>
+                          <xsl:if test="ead:scopecontent">
+                            <mods:abstract>
+                              <xsl:for-each select="ead:scopecontent/ead:p">
+                                <xsl:value-of select="."/>
+                                <xsl:text> </xsl:text>
+                              </xsl:for-each>
+                            </mods:abstract>
+                          </xsl:if>
+
+                          <!-- mods:language - usually at the collection level, but we should accommodate it here -->
+                          <xsl:if test="ead:did/ead:langmaterial/ead:language">
+                            <mods:language>
+                              <xsl:for-each select="ead:did/ead:langmaterial/ead:language">
+                                <xsl:if test=". != ''">
+                                  <mods:languageTerm type='text'>
+                                    <xsl:value-of select="."/>
+                                  </mods:languageTerm>  
+                                </xsl:if>
+                                <xsl:if test="./@langcode">
+                                  <mods:languageTerm type='code'>
+                                    <xsl:value-of select="./@langcode"/>
+                                  </mods:languageTerm>
+                                </xsl:if>
+                              </xsl:for-each>
+                            </mods:language>  
+                          </xsl:if>
+
+                          <!-- mods:note - best guess here, notes can be dropped a lot of places - separated a few into easy to read categories for easier modification -->
+                          <xsl:if test="ead:note">
+                            <mods:note>
+                              <xsl:value-of select="ead:note/ead:p"/>
+                            </mods:note>
+                          </xsl:if>
+
+                          <xsl:if test="ead:did/ead:note">
+                            <mods:note>
+                              <xsl:value-of select="ead:did/ead:note/ead:p"/>
+                            </mods:note>
+                          </xsl:if>
+
+                          <xsl:if test="ead:odd">
+                            <mods:note>
+                              <xsl:value-of select="ead:odd"/>
+                            </mods:note>
+                          </xsl:if>
+
+                        </mods:mods>
+                      </xsl:result-document>
+                    </xsl:otherwise>
+                  </xsl:choose>
+                </xsl:for-each>
+              </xsl:when>
+              <xsl:otherwise>
+
+                <!-- c02 level items -->
+                <xsl:result-document href="{../../../ead:did/ead:unitid}_{../ead:did/ead:unittitle}/c02/c02_{position()}.xml">
+                  <!-- top level mods declaration -->
+                  <mods:mods xmlns="http://www.loc.gov/mods/v3" xmlns:mods="http://www.loc.gov/mods/v3" xmlns:xlink="http://www.w3.org/1999/xlink" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+
+                    <!-- mods:relatedItem - including the collection from which the item is drawn -->  
+                    <mods:relatedItem displayLabel="Parent Collection" type="host">
+                      <mods:titleInfo>
+                        <mods:title>
+                          <xsl:value-of select="../../../ead:did/ead:unittitle"/>
+                        </mods:title>
+                      </mods:titleInfo>
+                      <mods:identifier>
+                        <xsl:value-of select="../../../ead:did/ead:unitid"/>
+                      </mods:identifier>
+                      <mods:location>
+                        <mods:url>
+                          <xsl:value-of select="../../../../ead:eadheader/ead:eadid/@url"/>
+                        </mods:url>
+                      </mods:location>
+                    </mods:relatedItem>
+
+                            <!-- mods:titleInfo - title of item -->
+                            <mods:titleInfo><mods:title>
+                              <!-- adding a conditional here to handle unittitles that end in ; - can remove if desired-->
+                              <xsl:choose>
+                                <xsl:when test="ends-with(ead:did/ead:unittitle, ';')">
+                                  <xsl:value-of select="substring-before(ead:did/ead:unittitle, ';')"/>
+                                </xsl:when>
+                                <xsl:otherwise>
+                                  <xsl:value-of select="ead:did/ead:unittitle"/>
+                                </xsl:otherwise>
+                              </xsl:choose>                  
+                            </mods:title></mods:titleInfo>
+
+                    <!-- mods:originInfo -->
+                    <xsl:if test="ead:did/ead:unitdate">
+                      <mods:originInfo>
+                        <mods:dateIssued>
+                          <xsl:value-of select="ead:did/ead:unitdate"/>
+                        </mods:dateIssued>
+                      </mods:originInfo>
+                    </xsl:if>
+
+                    <!-- mods:typeOfResource - based on controlled values - http://www.loc.gov/standards/mods/userguide/typeofresource.html - assuming it's text here - adjust if necessary -->
+                    <mods:typeOfResource>text</mods:typeOfResource>
+
+                    <!-- mods:physicalDescription - combination of data from EAD and controlled values -->
+                    <mods:physicalDescription>
+                      <xsl:if test="ead:did/ead:physdesc">
+                        <mods:extent>
+                          <xsl:value-of select="ead:did/ead:physdesc"/>
+                        </mods:extent>
+                      </xsl:if>
+                      <!-- mods:digitalOrigin - controlled vocabulary - assume this is a scanning job -->
+                      <mods:digitalOrigin>reformatted digital</mods:digitalOrigin>
+                      <!-- mods:reformattingQuality - controlled vocabulary - must be one of: access, preservation, or replacement - adjust as necessary -->
+                      <mods:reformattingQuality>access</mods:reformattingQuality>
+                      <!-- mods:form - this will vary - it may be best to hand edit these after ingest -->
+                      <mods:form>text</mods:form>
+                    </mods:physicalDescription>
+                    <!-- mods:accessCondition - inserting copyright -->
+                    <mods:accessCondition type="use and reproduction">Copyright American Philosophical Society. For reproduction and permission information, see http://www.amphilsoc.org/library/rights.htm</mods:accessCondition>
+
+                    <!-- mods:genre -->
+                    <xsl:if test="ead:did/ead:physdesc/ead:genreform">
+                      <mods:genre>
+                        <xsl:value-of select="ead:did/ead:physdesc/ead:genreform"/>
+                      </mods:genre>
+                    </xsl:if>  
+
+                    <!-- mods:name  -->
+                    <xsl:if test="ead:did/ead:origination">
+                      <xsl:for-each select="ead:did/ead:origination">
+                        <xsl:choose>
+                          <xsl:when test="./ead:persname">
+                            <mods:name type="personal">
+                              <mods:namePart>
+                                <xsl:value-of select="."/>
+                              </mods:namePart>
+                            </mods:name>
+                          </xsl:when>
+                          <xsl:when test="./ead:corpname">
+                            <mods:name type="corporate">
+                              <mods:namePart>
+                                <xsl:value-of select="."/>
+                              </mods:namePart>
+                            </mods:name>
+                          </xsl:when>
+                          <xsl:when test="./ead:famname">
+                            <mods:name type="family">
+                              <mods:namePart>
+                                <xsl:value-of select="."/>
+                              </mods:namePart>
+                            </mods:name>
+                          </xsl:when>
+                          <xsl:when test="./ead:confname">
+                            <mods:name type="conference">
+                              <mods:namePart>
+                                <xsl:value-of select="."/>
+                              </mods:namePart>
+                            </mods:name>
+                          </xsl:when>
+                          <xsl:otherwise>
+                            <mods:name>
+                              <mods:namePart>
+                                <xsl:value-of select="."/>
+                              </mods:namePart>
+                            </mods:name>
+                          </xsl:otherwise>
+                        </xsl:choose>
+                        <xsl:if test="./@label">
+                          <mods:role>
+                            <mods:roleTerm type="text">
+                              <xsl:value-of select="./@label"/>
+                            </mods:roleTerm>
+                          </mods:role>
+                        </xsl:if>
+                      </xsl:for-each>
+                    </xsl:if>
+
+                    <!-- mods:abstract - it's unlikely that there will be an ead:abstract at the component level, but we accommodate it here -->
+                    <xsl:if test="ead:did/ead:abstract">
+                      <mods:abstract>
+                        <xsl:value-of select="ead:did/ead:abstract"/>
+                      </mods:abstract>
+                    </xsl:if>
+                    <xsl:if test="ead:scopecontent">
+                      <mods:abstract>
+                        <xsl:for-each select="ead:scopecontent/ead:p">
+                          <xsl:value-of select="."/>
+                          <xsl:text> </xsl:text>
+                        </xsl:for-each>
+                      </mods:abstract>
+                    </xsl:if>
+
+                    <!-- mods:language - usually at the collection level, but we should accommodate it here -->
+                    <xsl:if test="ead:did/ead:langmaterial/ead:language">
+                      <mods:language>
+                        <xsl:for-each select="ead:did/ead:langmaterial/ead:language">
+                          <xsl:if test=". != ''">
+                            <mods:languageTerm type='text'>
+                              <xsl:value-of select="."/>
+                            </mods:languageTerm>  
+                          </xsl:if>
+                          <xsl:if test="./@langcode">
+                            <mods:languageTerm type='code'>
+                              <xsl:value-of select="./@langcode"/>
+                            </mods:languageTerm>
+                          </xsl:if>
+                        </xsl:for-each>
+                      </mods:language>  
+                    </xsl:if>
+
+                    <!-- mods:note - best guess here, notes can be dropped a lot of places - separated a few into easy to read categories for easier modification -->
+                    <xsl:if test="ead:note">
+                      <mods:note>
+                        <xsl:value-of select="ead:note/ead:p"/>
+                      </mods:note>
+                    </xsl:if>
+
+                    <xsl:if test="ead:did/ead:note">
+                      <mods:note>
+                        <xsl:value-of select="ead:did/ead:note/ead:p"/>
+                      </mods:note>
+                    </xsl:if>
+
+                    <xsl:if test="ead:odd">
+                      <mods:note>
+                        <xsl:value-of select="ead:odd"/>
+                      </mods:note>
+                    </xsl:if>
+
+                  </mods:mods>
+                </xsl:result-document>
+              </xsl:otherwise>
+            </xsl:choose>
+          </xsl:for-each>
+        </xsl:when>
+        <xsl:otherwise>
+        </xsl:otherwise>
+      </xsl:choose>
+    </xsl:for-each>
+  </xsl:template>
+</xsl:stylesheet>

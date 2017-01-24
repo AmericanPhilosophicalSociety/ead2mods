@@ -12,7 +12,7 @@
   *******************************************************************
   This stylesheet transforms EAD contents to individual MODS records for ingest into the APS digital repository.
   It provides conversion for c02, c03, and c04 level contents. To go deeper, simply adopt the choose logic and copy the lines within the xsl:result-document tags. Be sure to reflect the new depth in result-document and the mods tags within mods:relatedItem, which use top-level description for information
-  This sheet creates a new directory for every series and a new subdirectory for every component level.
+  This sheet creates a new directory for every series and denotes component level in the filenames.
   Due to the reality that not every EAD finding aid conforms to the same standard, it is nearly impossible to make a one size fits all solution. This stylesheet is designed as a beginning step. You may need to add or adjust to accomodate the realities of the finding aid you're working with. It's a good idea to scan the ead for oddities and review some test records before ingesting the newly created MODS.
   
   *******************************************************************
@@ -31,7 +31,7 @@
                       <xsl:for-each select="ead:c04">
 
                         <!-- c04 level items -->
-                        <xsl:result-document href="{../../../../../ead:did/ead:unitid}_{../../../ead:did/ead:unittitle}/c04/c04_{position()}.xml">
+                        <xsl:result-document href="{../../../../../ead:did/ead:unitid}_{../../../ead:did/ead:unittitle}/c02_{../../count(preceding-sibling::*)}.c03_{../count(preceding-sibling::*)}.c04_{position()}.xml">
                           <!-- top level mods declaration -->
                           <mods:mods xmlns="http://www.loc.gov/mods/v3" xmlns:mods="http://www.loc.gov/mods/v3" xmlns:xlink="http://www.w3.org/1999/xlink" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
 
@@ -210,7 +210,7 @@
                     <xsl:otherwise>
 
                       <!-- c03 level items -->
-                      <xsl:result-document href="{../../../../ead:did/ead:unitid}_{../../ead:did/ead:unittitle}/c03/c03_{position()}.xml">
+                      <xsl:result-document href="{../../../../ead:did/ead:unitid}_{../../ead:did/ead:unittitle}/c02_{../count(preceding-sibling::*)}.c03_{position()}.xml">
                         <!-- top level mods declaration -->
                         <mods:mods xmlns="http://www.loc.gov/mods/v3" xmlns:mods="http://www.loc.gov/mods/v3" xmlns:xlink="http://www.w3.org/1999/xlink" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
 
@@ -391,7 +391,7 @@
               <xsl:otherwise>
 
                 <!-- c02 level items -->
-                <xsl:result-document href="{../../../ead:did/ead:unitid}_{../ead:did/ead:unittitle}/c02/c02_{position()}.xml">
+                <xsl:result-document href="{../../../ead:did/ead:unitid}_{../ead:did/ead:unittitle}/c02_{position()}.xml">
                   <!-- top level mods declaration -->
                   <mods:mods xmlns="http://www.loc.gov/mods/v3" xmlns:mods="http://www.loc.gov/mods/v3" xmlns:xlink="http://www.w3.org/1999/xlink" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
 
